@@ -3,7 +3,7 @@ import streamlit as st
 from groq import Groq
 
 # Initialize the Groq client
-client = Groq(api_key='your_groq_api_key')
+client = Groq(api_key='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')
 
 # Memory to store conversation history
 if "memory" not in st.session_state:
