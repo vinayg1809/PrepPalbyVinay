@@ -1,52 +1,55 @@
 import streamlit as st
-from groq import Groq
+from groq import Groq, APIError
 
-api_key = st.secrets["groq"]["api_key"]
-client = Groq(api_key=api_key)
+# Initialize Groq client
+api_key = st.secrets["groq"].get("api_key", None)
+if not api_key:
+    st.error("API Key not found in secrets!")
+else:
+    client = Groq(api_key=api_key)
 
-# Memory to store conversation history
+# Initialize memory
 if "memory" not in st.session_state:
     st.session_state.memory = []
 
 # Chatbot response function
 def chatbot_response(user_input):
-    # Append the user's input to memory
-    st.session_state.memory.append({"role": "user", "content": user_input})
+    try:
+        st.session_state.memory.append({"role": "user", "content": user_input})
 
-    # Prepare the context for the assistant
-    prompt = '''You are an expert virtual assistant specializing in natural disasters. Your role is to provide accurate, well-researched, and actionable information on disaster preparedness, mitigation, and management.
-    Key Responsibilities:
-    Educator: Teach users everything about natural disasters, including causes, impacts, historical occurrences, and the science behind them...
-    '''
-    messages = [{"role": "system", "content": prompt}] + st.session_state.memory
+        prompt = '''You are an expert virtual assistant specializing in natural disasters.'''
+        messages = [{"role": "system", "content": prompt}] + st.session_state.memory
 
-    # Call the Groq API
-    chat_completion = client.chat.completions.create(
-        messages=messages,
-        model="llama3-70b-8192"
-    )
+        chat_completion = client.chat.completions.create(
+            messages=messages,
+            model="llama3-70b-8192"
+        )
+        bot_response = chat_completion.choices[0].message.content
+        st.session_state.memory.append({"role": "assistant", "content": bot_response})
 
-    # Get the model's response
-    bot_response = chat_completion.choices[0].message.content
+        return bot_response
+    except APIError as e:
+        st.error(f"API error: {e}")
+        return "Unable to process your request at the moment."
+    except Exception as e:
+        st.error(f"Unexpected error: {e}")
+        return "Something went wrong. Please try again later."
 
-    # Append the bot's response to memory
-    st.session_state.memory.append({"role": "assistant", "content": bot_response})
-
-    return bot_response
-
-# Streamlit app layout
+# App layout
 st.title("PrepPal by Vinay")
 st.subheader("Ask anything related to natural disasters!")
 
-# User input text box
 user_input = st.text_input("Your question:", placeholder="Type your question here...")
 
 if st.button("Ask"):
-    if user_input:
-        bot_response = chatbot_response(user_input)
-        # Display conversation
+    if user_input.strip():
+        with st.spinner("Preparing response..."):
+            bot_response = chatbot_response(user_input)
+
         for message in st.session_state.memory:
             if message["role"] == "user":
                 st.write(f"**You:** {message['content']}")
             elif message["role"] == "assistant":
                 st.write(f"**PrepPal:** {message['content']}")
+    else:
+        st.warning("Please enter a valid question.")
